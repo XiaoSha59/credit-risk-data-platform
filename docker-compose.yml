@@ -1,12 +1,8 @@
 version: '3.8'
 
-# ==============================================================================
-# CREDIT RISK DATA PLATFORM - LOCAL CLUSTER CONFIGURATION
-# ==============================================================================
-
 services:
   # ----------------------------------------------------------------------------
-  # 1. FOUNDATIONAL INFRASTRUCTURE
+  # 1. FOUNDATIONAL INFRASTRUCTURE (Đã đổi port để nhường 9092/2181 cho DataHub)
   # ----------------------------------------------------------------------------
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.0
@@ -23,21 +19,18 @@ services:
     image: confluentinc/cp-kafka:7.3.0
     container_name: platform-kafka
     ports:
-      - "9092:9092"
+      - "9093:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://127.0.0.1:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://127.0.0.1:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     depends_on:
       - zookeeper
     networks:
       - credit-risk-network
 
-  # ----------------------------------------------------------------------------
-  # 2. CUSTOM DATA GENERATOR
-  # ----------------------------------------------------------------------------
   data-generator:
     container_name: platform-data-generator
     build:
@@ -46,7 +39,7 @@ services:
     volumes:
       - .:/app
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - ENVIRONMENT=development
     depends_on:
       - kafka
@@ -64,18 +57,16 @@ services:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
       - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
     ports:
-      - "8080:8080"
+      - "8085:8080"
     volumes:
       - ./dags:/opt/airflow/dags
       - ./storage:/opt/airflow/storage
       - ./data:/opt/airflow/data
     networks:
       - credit-risk-network
-    command: airflow standalone
+    command: >
+      bash -c "airflow standalone"
 
-# ==============================================================================
-# NETWORK DEFINITION
-# ==============================================================================
 networks:
   credit-risk-network:
     driver: bridge
