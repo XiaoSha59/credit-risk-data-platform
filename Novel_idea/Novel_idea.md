@@ -192,3 +192,56 @@ The interactive HTML report generated at [data_quality_report.html](file:///d:/c
 | **[Novel_idea/data_quality_gate.py](file:///d:/credit-risk-data-platform/Novel_idea/data_quality_gate.py)** | Great Expectations validation logic & Data Docs HTML generator. |
 | **[Novel_idea/reports/data_quality_report.html](file:///d:/credit-risk-data-platform/Novel_idea/reports/data_quality_report.html)** | Generated HTML Data Docs validation report evidence. |
 
+---
+
+## 4. Execution Guide: How to Run the Novel Ideas
+
+Follow the step-by-step instructions below to run and verify both novel engineering implementations locally.
+
+### 4.1 Prerequisites
+- Active Python virtual environment (`.venv\Scripts\python.exe`).
+- Shell working directory set to project root (`d:\credit-risk-data-platform`).
+
+---
+
+### 4.2 Running Idea 1: Real-Time Debezium CDC Pipeline
+
+#### Step 1: Launch Debezium CDC Listener & Event Formatter
+Run the CDC connector listener script to display Debezium PostgreSQL connector status and stream formatted CDC events:
+```bash
+.venv\Scripts\python.exe Novel_idea/debezium_cdc_connector.py
+```
+*Expected Output:* Displays Debezium `RUNNING` state, connection parameters, and sample Debezium JSON payloads (`op: 'c'` for INSERT, `op: 'u'` for UPDATE).
+
+#### Step 2: Trigger Source Database Transactions (PostgreSQL WAL Events)
+Run the source transaction producer script to execute `INSERT` and `UPDATE` SQL queries against PostgreSQL:
+```bash
+.venv\Scripts\python.exe Novel_idea/cdc_transaction_producer.py
+```
+*Expected Output:* Inserts new loan `LOAN-CDC-...` and updates loan status to `DISBURSED`, generating PostgreSQL Write-Ahead Logs (WAL).
+
+---
+
+### 4.3 Running Idea 2: Automated Data Quality Gate Pipeline
+
+#### Step 1: Execute Data Quality Gate Validation Engine
+Run the data quality validation script to test both Clean Data and Anomalous Data scenarios:
+```bash
+.venv\Scripts\python.exe Novel_idea/data_quality_gate.py
+```
+*Expected Output:*
+- **Clean Run:** `DATA QUALITY GATE PASSED!` — Generates HTML report at `Novel_idea/reports/data_quality_report.html`.
+- **Anomalous Run:** Evaluates negative EAD amount (`-1,500,000 VND`) and Null rate (12%), triggers exception `[DATA QUALITY GATE FAILED]`, and halts execution.
+
+#### Step 2: Execute Airflow Quality Gate DAG Task Sequence
+Run the standalone Airflow DAG task runner to simulate end-to-end task execution:
+```bash
+.venv\Scripts\python.exe Novel_idea/credit_risk_dp2_quality_gate.py
+```
+*Expected Output:* Runs task pipeline: `ingest_bronze` ➔ `data_quality_check` ➔ `transform_silver` ➔ `gold_dw_sync`.
+
+#### Step 3: View Interactive HTML Data Docs Report
+Open the generated validation report in your web browser:
+- Path: [Novel_idea/reports/data_quality_report.html](file:///d:/credit-risk-data-platform/Novel_idea/reports/data_quality_report.html)
+
+
