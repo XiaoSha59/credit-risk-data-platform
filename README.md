@@ -31,7 +31,7 @@ This enterprise data platform implements a hybrid Lambda/Kappa-inspired architec
 
 Below is the deployable unit-based architecture diagram illustrating the 4 core numbered operational flows:
 
-![System Deployment Diagram](./images/architecture-diagram.png)
+![System Deployment Diagram](./docs/images/architecture-diagram.png)
 
 ```mermaid
 graph TD
@@ -215,16 +215,16 @@ For exhaustive technical deep-dives, benchmark reports, and operational guides, 
 
 | Focus Area | Document Link | Description |
 |---|---|---|
-| **System Architecture Diagram** | [architecture-diagram.png](./images/architecture-diagram.png) | High-res 300 DPI deployable unit architecture diagram image. |
-| **Real-Time Streaming** | [streaming_pipeline_report.md](./streaming_pipeline_report.md) | PyFlink baseline vs optimized streaming report (burst handling, late arrival, checkpointing). |
-| **Streaming Specs Index** | [Online_Data_Pipeline_Index.md](./Online_Data_Pipeline_Index.md) | Online streaming pipeline specs and event schema descriptions. |
-| **Offline Pipeline Optimization** | [offline_pipeline_optimization_report.md](./offline_pipeline_optimization_report.md) | Benchmark analysis of Delta Lake compaction & Z-Order clustering performance. |
-| **Storage Architecture Study** | [storage.md](./study-purpose/storage.md) | Technical comparison between Raw Parquet baseline and Delta Lakehouse storage. |
-| **Offline Pipeline Specs** | [Offline_Data_Pipeline_Index.md](./Offline_Data_Pipeline_Index.md) | Detailed breakdown of batch ingestion, Silver cleaning, and Gold feature engineering. |
-| **Offline Processing Overview** | [Offline_Processing_Index.md](./Offline_Processing_Index.md) | High-level summary of batch processing stages and data transformations. |
-| **Airflow Orchestration** | [airflow_orchestration.md](./airflow_orchestration.md) | Complete operational guide for Airflow DAGs (DP1, DP2, DP3) and retry policies. |
-| **Data Governance & Contracts** | [data_goverance.md](./data_goverance.md) | Implementation report for DataHub lineage, schema contracts, and Great Expectations quality audit. |
-| **Warehouse & ER Diagram** | [schema_design.md](./schema_design.md) | Multi-zone database navigation evidence and DBeaver ER diagram for Gold zone tables. |
-| **SQL DW DDL Setup** | [schema_setup.sql](./sql/schema_setup.sql) | DDL script setting up `bronze`, `silver`, and `gold` schemas in PostgreSQL DW. |
-| **IaC & Containerization** | [IaC_Docker.md](./IaC_Docker.md) | Multi-stage Docker build footprint analysis and image optimization benchmark. |
-| **Docker Study Guide** | [Docker_Optimization.md](./study-purpose/Docker_Optimization.md) | Educational reference on container multi-staging and Alpine base image selection. |
+| **System Architecture Diagram** | [architecture-diagram.png](./docs/images/architecture-diagram.png) | High-res 300 DPI deployable unit architecture diagram image. |
+| **Real-Time Streaming** | [streaming_pipeline_report.md](./docs/streaming_pipeline_report.md) | PyFlink baseline vs optimized streaming report (burst handling, late arrival, checkpointing). |
+| **Streaming Specs Index** | [Online_Data_Pipeline_Index.md](./docs/Online_Data_Pipeline_Index.md) | Online streaming pipeline specs and event schema descriptions. |
+| **Offline Pipeline Optimization** | [offline_pipeline_optimization_report.md](./docs/offline_pipeline_optimization_report.md) | Benchmark analysis of Delta Lake compaction & Z-Order clustering performance. |
+| **Storage Architecture Study** | [storage.md](./docs/study-purpose/storage.md) | Technical comparison between Raw Parquet baseline and Delta Lakehouse storage. |
+| **Offline Pipeline Specs** | [Offline_Data_Pipeline_Index.md](./docs/Offline_Data_Pipeline_Index.md) | Detailed breakdown of batch ingestion, Silver cleaning, and Gold feature engineering. |
+| **Offline Processing Overview** | [Offline_Processing_Index.md](./docs/Offline_Processing_Index.md) | High-level summary of batch processing stages and data transformations. |
+| **Airflow Orchestration** | [airflow_orchestration.md](./docs/airflow_orchestration.md) | Complete operational guide for Airflow DAGs (DP1, DP2, DP3) and retry policies. |
+| **Data Governance & Contracts** | [data_goverance.md](./docs/data_goverance.md) | Implementation report for DataHub lineage, schema contracts, and Great Expectations quality audit. |
+| **Warehouse & ER Diagram** | [schema_design.md](./docs/schema_design.md) | Multi-zone database navigation evidence and DBeaver ER diagram for Gold zone tables. |
+| **SQL DW DDL Setup** | [schema_setup.sql](./docs/sql/schema_setup.sql) | DDL script setting up `bronze`, `silver`, and `gold` schemas in PostgreSQL DW. |
+| **IaC & Containerization** | [IaC_Docker.md](./docs/IaC_Docker.md) | Multi-stage Docker build footprint analysis and image optimization benchmark. |
+| **Docker Study Guide** | [Docker_Optimization.md](./docs/study-purpose/Docker_Optimization.md) | Educational reference on container multi-staging and Alpine base image selection. |
