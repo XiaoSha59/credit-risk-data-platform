@@ -448,3 +448,46 @@ Source: Kafka_Credit_Risk_Source
 | **Burst handling** | ❌ Xử lý từng event | ✅ Gom qua window lớn hơn |
 | **Late arrival tolerance** | ❌ Bỏ qua | ✅ Window rộng hấp thụ tự nhiên |
 | **Consumer group** | `credit_risk_baseline_group` | `credit_risk_optimized_group` |
+
+---
+
+---
+
+## PHẦN 3: SO SÁNH STORAGE BASELINE VS OPTIMIZED LAKEHOUSE
+
+### 3.1 Baseline Storage (`storage/baseline_storage.py`)
+
+- **Định dạng lưu trữ:** Parquet thuần (`data/raw/credit_risk_parquet/`).
+- **Phương thức ghi:** `append`.
+- **Đặc điểm & Hạn chế:**
+  1. **Tạo ra nhiều file nhỏ (Small File Problem):** Mỗi lần micro-batch hoặc stream append dữ liệu, một file Parquet nhỏ sẽ được ghi. Qua thời gian, số lượng file nhỏ tăng đột biến làm giảm hiệu năng truy vấn (Small File Problem).
+  2. **Không phân vùng (Unpartitioned):** Dữ liệu lưu chung một thư mục. Truy vấn lọc theo ngày phải quét toàn bộ tập dữ liệu (Full Table Scan).
+  3. **Không hỗ trợ ACID Transactions:** Ghi/đọc đồng thời có thể gây lỗi dữ liệu không đồng nhất hoặc dở dang.
+
+---
+
+### 3.2 Optimized Lakehouse (`storage/optimized_lakehouse.py`)
+
+- **Định dạng lưu trữ:** Delta Lake (`data/lakehouse/credit_risk_delta/`).
+- **Phương thức & Kỹ thuật tối ưu:**
+  1. **Partitioning theo `event_date` (`.partitionBy("event_date")`):**
+     - Giúp Spark kích hoạt **Partition Pruning** — chỉ đọc đúng folder ngày cần truy vấn, bỏ qua 90%+ dữ liệu dư thừa.
+  2. **Compaction (`deltaTable.optimize().executeCompaction()`):**
+     - Tự động gom hàng ngàn file Parquet nhỏ thành các file lớn chuẩn (thường 128MB - 1GB), giải quyết triệt để lỗi Small File Problem.
+  3. **Z-Order Clustering (`deltaTable.optimize().executeZOrderBy("customer_id")`):**
+     - Sắp xếp lại dữ liệu theo chiều không gian đa chiều (Multi-dimensional Clustering) dựa trên `customer_id`.
+     - Cho phép **Data Skipping** ở mức độ chi tiết (file statistics min/max), tối ưu tốc độ đọc khi lọc thông tin khách hàng.
+  4. **Hỗ trợ ACID & Time Travel:** Đảm bảo tính toàn vẹn dữ liệu khi có nhiều tiến trình cùng đọc/ghi.
+
+---
+
+### 3.3 Bảng so sánh Storage Baseline vs Storage Optimized
+
+| Tiêu chí | Storage Baseline (`baseline_storage.py`) | Storage Optimized (`optimized_lakehouse.py`) |
+|---|---|---|
+| **Định dạng (Format)** | Parquet thuần | Delta Lake |
+| **Phân vùng (Partitioning)** | ❌ Không (Unpartitioned) | ✅ Có (`partitionBy("event_date")`) |
+| **Quản lý file nhỏ** | ❌ Bị Small File Problem | ✅ Compaction (`executeCompaction()`) |
+| **Tốc độ truy vấn Khách hàng** | ❌ Full Table Scan | ✅ Z-Order Clustering (`customer_id`) |
+| **Tính toàn vẹn (ACID)** | ❌ Không hỗ trợ | ✅ ACID Transactions & Time Travel |
+
