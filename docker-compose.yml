@@ -42,9 +42,8 @@ services:
     container_name: platform-data-generator
     build:
       context: .
-      dockerfile: Dockerfile # Points to the Optimized Multi-stage Dockerfile
+      dockerfile: Dockerfile
     volumes:
-      # Mount local directory to container for rapid development without rebuilds
       - .:/app
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
@@ -53,6 +52,26 @@ services:
       - kafka
     networks:
       - credit-risk-network
+
+  # ----------------------------------------------------------------------------
+  # 3. ORCHESTRATION INFRASTRUCTURE (AIRFLOW)
+  # ----------------------------------------------------------------------------
+  airflow:
+    image: apache/airflow:2.9.0-python3.10
+    container_name: credit_risk_airflow
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./storage:/opt/airflow/storage
+      - ./data:/opt/airflow/data
+    networks:
+      - credit-risk-network
+    command: airflow standalone
 
 # ==============================================================================
 # NETWORK DEFINITION
