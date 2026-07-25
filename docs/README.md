@@ -29,89 +29,76 @@ This enterprise data platform implements a hybrid Lambda/Kappa-inspired architec
 
 ## 2. High-Level System Deployment Diagram
 
-Below is the deployable unit-based architecture diagram illustrating the 4 core numbered operational flows:
+Below is the high-level system deployment architecture illustrating the 4 core color-coded data processing flows:
 
-![System Deployment Diagram](./images/architecture-diagram.png)
+![Credit Risk Data Platform - High Level Architecture](./images/architecture-diagram.png)
 
 ```mermaid
 graph TD
-    classDef deployable fill:#1E293B,stroke:#38BDF8,stroke-width:2px,color:#F8FAFC;
-    classDef batchUnit fill:#1E293B,stroke:#4ADE80,stroke-width:2px,color:#F8FAFC;
-    classDef govUnit fill:#1E293B,stroke:#C084FC,stroke-width:2px,color:#F8FAFC;
-    classDef userUnit fill:#1E293B,stroke:#FB923C,stroke-width:2px,color:#F8FAFC;
-    classDef monitorUnit fill:#1E293B,stroke:#FACC15,stroke-width:2px,color:#F8FAFC;
+    classDef streamUnit fill:#FFFFFF,stroke:#1D4ED8,stroke-width:2px,color:#0F172A;
+    classDef batchUnit fill:#FFFFFF,stroke:#15803D,stroke-width:2px,color:#0F172A;
+    classDef servingUnit fill:#FFFFFF,stroke:#C2410C,stroke-width:2px,color:#0F172A;
+    classDef govUnit fill:#FFFFFF,stroke:#7E22CE,stroke-width:2px,color:#0F172A;
 
-    %% -------------------------------------------------------------------------
-    %% DEPLOYABLE UNITS (CONTAINERS / SERVICES)
-    %% -------------------------------------------------------------------------
-    subgraph Ingestion_and_Streaming ["Real-Time Streaming Infrastructure"]
-        DataGen["Data Generator Service<br/><i>(Docker: platform-data-generator)</i>"]:::deployable
-        Zookeeper["Zookeeper Service<br/><i>(Docker: platform-zookeeper)</i>"]:::deployable
-        Kafka["Kafka Message Broker<br/><i>(Docker: platform-kafka)</i>"]:::deployable
-        FlinkEngine["PyFlink Stream Engine<br/><i>(Flink Cluster / Stream Worker)</i>"]:::deployable
+    subgraph RealTimeStreaming ["1. Real-Time Streaming Pipeline"]
+        DataGen["<b>Data Generator Service</b><br/><i>(Docker)</i><br/><br/><small>Generate synthetic credit events</small>"]:::streamUnit
+        Kafka["<b>Apache Kafka Broker</b><br/><i>(Docker)</i><br/><br/><small>Topic: credit_risk_events</small>"]:::streamUnit
+        FlinkEngine["<b>Apache Flink Stream Engine</b><br/><i>(Flink Cluster)</i><br/><br/><small>Window Aggregation (60s)<br/>Risk Classification</small>"]:::streamUnit
+        DeltaBronze["<b>Delta Lake Storage</b><br/><i>(Bronze Zone)</i><br/><br/><small>Stream Sinks (Parquet Files)</small>"]:::streamUnit
     end
 
-    subgraph Batch_and_Lakehouse ["Offline Batch & Lakehouse Infrastructure"]
-        Airflow["Airflow Orchestrator<br/><i>(Docker: credit_risk_airflow)</i>"]:::batchUnit
-        SparkEngine["PySpark Batch Engine<br/><i>(Spark Cluster Engine)</i>"]:::batchUnit
-        Lakehouse["Delta Lakehouse Storage<br/><i>(Storage Volume: Bronze/Silver/Gold)</i>"]:::batchUnit
+    subgraph OfflineBatch ["2. Offline Batch & Lakehouse Pipeline"]
+        Airflow["<b>Apache Airflow Orchestrator</b><br/><i>(Docker)</i>"]:::batchUnit
+        SparkEngine["<b>Apache Spark Batch Engine</b><br/><i>(Spark Cluster)</i><br/><br/><small>ETL Processing (Data Cleaning, Join, Aggregation, Upsert)</small>"]:::batchUnit
+        DeltaGold["<b>Delta Lake Storage</b><br/><i>(Silver / Gold Zones)</i><br/><br/><small>Delta Tables (Optimized)<br/>Compaction & Z-Order</small>"]:::batchUnit
+        PostgresDW["<b>PostgreSQL Data Warehouse</b><br/><i>(Docker)</i><br/><br/><small>Gold OBTs + Dimensional Models (Fact/Dim Tables)</small>"]:::batchUnit
     end
 
-    subgraph Serving_and_Governance ["Serving & Governance Infrastructure"]
-        PostgresDW["PostgreSQL DW<br/><i>(Docker: credit_risk_postgres)</i>"]:::userUnit
-        DataHubGMS["DataHub Governance Server<br/><i>(Docker: platform-datahub-gms)</i>"]:::govUnit
+    subgraph ServingAnalytics ["3. Serving & Analytics"]
+        Analyst["<b>Risk Analyst / DBeaver</b><br/><i>(External Client)</i>"]:::servingUnit
     end
 
-    subgraph Users_and_Monitoring ["Interfaces & Operations"]
-        RiskAnalyst["Risk Analyst / DBeaver<br/><i>(External SQL Client)</i>"]:::userUnit
-        WebUI["Flink & Airflow Web UI<br/><i>(Dashboard & Monitoring)</i>"]:::monitorUnit
-        DataHubUI["DataHub Web UI<br/><i>(Governance Catalog UI)</i>"]:::govUnit
+    subgraph DataGovernance ["4. Data Governance"]
+        DataHub["<b>DataHub Data Governance Platform</b><br/><i>(Docker)</i><br/><br/><small>Metadata, Lineage, Schema Contracts, Data Quality</small>"]:::govUnit
     end
 
     %% -------------------------------------------------------------------------
-    %% INTERNAL METADATA SYNC (Dashed)
+    %% FLOW 1: STREAMING DATA FLOW (Real-Time) - Blue Lines
     %% -------------------------------------------------------------------------
-    Zookeeper -.-|Cluster State Sync| Kafka
+    DataGen -->|1.1 Credit Events (JSON)| Kafka
+    Kafka -->|1.2 Streaming Events| FlinkEngine
+    FlinkEngine -->|1.3 Windowed Metrics (Parquet)| DeltaBronze
 
     %% -------------------------------------------------------------------------
-    %% FLOW 1: ONLINE REAL-TIME STREAMING PIPELINE (Blue Arrows)
+    %% FLOW 2: BATCH DATA FLOW (Offline) - Green Lines
     %% -------------------------------------------------------------------------
-    DataGen -->|1.1: Raw Streaming Credit Events| Kafka
-    Kafka -->|1.2: Topic credit_risk_events| FlinkEngine
-    FlinkEngine -->|1.3: Stream Metrics & Window Logs| WebUI
-    FlinkEngine -->|1.4: Stream Checkpoints & Parquet Sinks| Lakehouse
+    Airflow -->|2.1 Trigger ETL DAGs| SparkEngine
+    DeltaBronze -->|2.2 Read Raw Data (Parquet/Delta)| SparkEngine
+    SparkEngine -->|2.3 Write Delta Tables| DeltaGold
+    DeltaGold -->|2.4 Sync Gold Tables| PostgresDW
 
     %% -------------------------------------------------------------------------
-    %% FLOW 2: OFFLINE BATCH & LAKEHOUSE PIPELINE (Green Arrows)
+    %% FLOW 3: SERVING / ANALYTICS FLOW (User Query) - Orange Line
     %% -------------------------------------------------------------------------
-    Airflow -->|2.1: Triggers Ingest & ETL DAGs DP1/DP2/DP3| SparkEngine
-    Lakehouse -->|2.2: Reads Raw Source Parquet/CSV| SparkEngine
-    SparkEngine -->|2.3: Writes Bronze, Silver & Gold Delta Tables| Lakehouse
-    SparkEngine -->|2.4: Syncs Gold DW OBT & Fact/Dim Tables| PostgresDW
+    PostgresDW -->|3.1 SQL Query / Analytics| Analyst
 
     %% -------------------------------------------------------------------------
-    %% FLOW 3: DATA GOVERNANCE & QUALITY AUDIT (Purple Arrows)
+    %% FLOW 4: GOVERNANCE & METADATA FLOW (Lineage & Quality) - Dashed Purple Lines
     %% -------------------------------------------------------------------------
-    SparkEngine -->|3.1: Lineage, Schema Contracts & Quality Meta| DataHubGMS
-    Airflow -->|3.1: DAG Orchestration Metadata| DataHubGMS
-    DataHubGMS -->|3.2: Lineage Graph & Catalog Metadata| DataHubUI
-
-    %% -------------------------------------------------------------------------
-    %% FLOW 4: USER ANALYTICS & OPERATIONAL CONTROL (Orange/Yellow Arrows)
-    %% -------------------------------------------------------------------------
-    RiskAnalyst -->|4.1: SQL Queries on Gold 360 Risk Tables| PostgresDW
-    Airflow -->|4.2: Execution Status & Logs| WebUI
+    DeltaBronze -.-|4.1 Metadata & Lineage| DataHub
+    DeltaGold -.-|4.1 Metadata & Lineage| DataHub
+    PostgresDW -.-|4.1 Metadata & Lineage| DataHub
 ```
 
 ### Architecture Principles & Rubric Compliance
-1. **Deployable Units Only:** Every box represents an independently deployable container, cluster service, or external UI (`platform-data-generator`, `platform-kafka`, `credit_risk_airflow`, `credit_risk_postgres`, `platform-datahub-gms`, etc.). Embedded libraries/SDKs (Feast SDK, Pydantic, Great Expectations) execute inside the container processes and are not separate deployable boxes.
-2. **Data Flow & Arrow Directions:** Arrows strictly follow data movement and carry descriptive payload labels.
-3. **Numbered Multi-Flow Lineage:** Distinct colors and sequence numbers demarcate operational workflows:
-   - **Flow 1 (Blue — 1.1 to 1.4):** Real-time Kafka event streaming, Flink 60s tumbling window aggregation, risk classification, and stateful checkpointing.
-   - **Flow 2 (Green — 2.1 to 2.4):** Airflow-orchestrated PySpark batch ingestion, Medallion Lakehouse transformations (Bronze/Silver/Gold), Delta Compaction & Z-Order, and PostgreSQL DW syncing.
-   - **Flow 3 (Purple — 3.1 to 3.2):** Automated emission of data lineage graphs, schema contracts, and quality assertions to DataHub.
-   - **Flow 4 (Orange/Yellow — 4.1 to 4.2):** Risk Analyst SQL queries on Gold 360 tables via DBeaver and Data Engineer operational dashboard monitoring.
-4. **Solid Lines for Primary Flow:** Solid arrows represent primary data paths; a dashed line is strictly reserved for internal Zookeeper-Kafka metadata synchronization.
+1. **Deployable Units Only:** Every box represents an independently deployable container, cluster service, or external UI (`Data Generator Service (Docker)`, `Apache Kafka Broker (Docker)`, `Apache Airflow Orchestrator (Docker)`, `PostgreSQL Data Warehouse (Docker)`, `DataHub Data Governance Platform (Docker)`, etc.). Embedded libraries/SDKs (Feast SDK, Pydantic, Great Expectations) execute inside the container processes and are omitted as separate boxes.
+2. **Data Flow & Arrow Directions:** Arrows strictly follow data transmission direction with explicit payload labels on arrow badges (`1.1 Credit Events (JSON)`, `1.2 Streaming Events`, `2.2 Read Raw Data (Parquet/Delta)`, `3.1 SQL Query / Analytics`, `4.1 Metadata & Lineage`).
+3. **Numbered Multi-Flow Lineage:** Distinct color-coded flows with step numbers demarcate platform operations:
+   - **Flow 1: Streaming Data Flow (Real-Time — Blue Steps 1.1 to 1.3):** Real-time synthetic event generation, Kafka topic streaming, PyFlink 60s window aggregation, and Bronze zone Parquet streaming sinks.
+   - **Flow 2: Batch Data Flow (Offline — Green Steps 2.1 to 2.4):** Airflow-triggered PySpark batch ETL processing, reading raw Bronze Parquet files, writing Silver & Gold Delta Lake tables with Compaction and Z-Order clustering, and syncing Gold tables to PostgreSQL DW.
+   - **Flow 3: Serving / Analytics Flow (User Query — Orange Step 3.1):** End-user Risk Analysts performing SQL analytical queries on Gold 360 Risk tables via DBeaver.
+   - **Flow 4: Governance & Metadata Flow (Lineage & Quality — Dashed Purple Step 4.1):** Automated emission of data lineage, schema contracts, and data quality execution metadata across Lakehouse zones to DataHub.
+4. **Solid vs Dashed Lines:** Primary data processing paths use solid lines (Flows 1, 2, 3); dashed purple lines are reserved for metadata, lineage, and governance synchronization (Flow 4).
 
 ---
 
@@ -215,7 +202,7 @@ For exhaustive technical deep-dives, benchmark reports, and operational guides, 
 
 | Focus Area | Document Link | Description |
 |---|---|---|
-| **System Architecture Diagram** | [architecture-diagram.png](./images/architecture-diagram.png) | High-res 300 DPI deployable unit architecture diagram image. |
+| **System Architecture Diagram** | [architecture-diagram.png](./images/architecture-diagram.png) | High-res deployable unit architecture diagram image. |
 | **Real-Time Streaming** | [streaming_pipeline_report.md](./streaming_pipeline_report.md) | PyFlink baseline vs optimized streaming report (burst handling, late arrival, checkpointing). |
 | **Streaming Specs Index** | [Online_Data_Pipeline_Index.md](./Online_Data_Pipeline_Index.md) | Online streaming pipeline specs and event schema descriptions. |
 | **Offline Pipeline Optimization** | [offline_pipeline_optimization_report.md](./offline_pipeline_optimization_report.md) | Benchmark analysis of Delta Lake compaction & Z-Order clustering performance. |
