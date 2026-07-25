@@ -1,0 +1,13 @@
+n_loans: 100000
+start_date: "2024-01-01"
+end_date: "2026-01-01"
+duplicate_rate: 0.02
+schema_evolution_cutoff_days: 180
+
+skew_distributions:
+  loan_purpose:
+    categories: ["Consumer Loan", "Credit Card", "Mortgage", "Auto Loan"]
+    probabilities: [0.65, 0.20, 0.10, 0.05]
+  branch_city:
+    categories: ["Ho Chi Minh City", "Hanoi", "Da Nang", "Hai Phong", "Others"]
+    probabilities: [0.45, 0.40, 0.05, 0.05, 0.05]
