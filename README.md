@@ -33,64 +33,8 @@ Below is the high-level system deployment architecture illustrating the 4 core c
 
 ![Credit Risk Data Platform - High Level Architecture](./docs/images/architecture-diagram.png)
 
-```mermaid
-graph TD
-    classDef streamUnit fill:#FFFFFF,stroke:#1D4ED8,stroke-width:2px,color:#0F172A;
-    classDef batchUnit fill:#FFFFFF,stroke:#15803D,stroke-width:2px,color:#0F172A;
-    classDef servingUnit fill:#FFFFFF,stroke:#C2410C,stroke-width:2px,color:#0F172A;
-    classDef govUnit fill:#FFFFFF,stroke:#7E22CE,stroke-width:2px,color:#0F172A;
-
-    subgraph RealTimeStreaming ["1. Real-Time Streaming Pipeline"]
-        DataGen["<b>Data Generator Service</b><br/><i>(Docker)</i><br/><br/><small>Generate synthetic credit events</small>"]:::streamUnit
-        Kafka["<b>Apache Kafka Broker</b><br/><i>(Docker)</i><br/><br/><small>Topic: credit_risk_events</small>"]:::streamUnit
-        FlinkEngine["<b>Apache Flink Stream Engine</b><br/><i>(Flink Cluster)</i><br/><br/><small>Window Aggregation (60s)<br/>Risk Classification</small>"]:::streamUnit
-        DeltaBronze["<b>Delta Lake Storage</b><br/><i>(Bronze Zone)</i><br/><br/><small>Stream Sinks (Parquet Files)</small>"]:::streamUnit
-    end
-
-    subgraph OfflineBatch ["2. Offline Batch & Lakehouse Pipeline"]
-        Airflow["<b>Apache Airflow Orchestrator</b><br/><i>(Docker)</i>"]:::batchUnit
-        SparkEngine["<b>Apache Spark Batch Engine</b><br/><i>(Spark Cluster)</i><br/><br/><small>ETL Processing (Data Cleaning, Join, Aggregation, Upsert)</small>"]:::batchUnit
-        DeltaGold["<b>Delta Lake Storage</b><br/><i>(Silver / Gold Zones)</i><br/><br/><small>Delta Tables (Optimized)<br/>Compaction & Z-Order</small>"]:::batchUnit
-        PostgresDW["<b>PostgreSQL Data Warehouse</b><br/><i>(Docker)</i><br/><br/><small>Gold OBTs + Dimensional Models (Fact/Dim Tables)</small>"]:::batchUnit
-    end
-
-    subgraph ServingAnalytics ["3. Serving & Analytics"]
-        Analyst["<b>Risk Analyst / DBeaver</b><br/><i>(External Client)</i>"]:::servingUnit
-    end
-
-    subgraph DataGovernance ["4. Data Governance"]
-        DataHub["<b>DataHub Data Governance Platform</b><br/><i>(Docker)</i><br/><br/><small>Metadata, Lineage, Schema Contracts, Data Quality</small>"]:::govUnit
-    end
-
-    %% -------------------------------------------------------------------------
-    %% FLOW 1: STREAMING DATA FLOW (Real-Time) - Blue Lines
-    %% -------------------------------------------------------------------------
-    DataGen -->|1.1 Credit Events (JSON)| Kafka
-    Kafka -->|1.2 Streaming Events| FlinkEngine
-    FlinkEngine -->|1.3 Windowed Metrics (Parquet)| DeltaBronze
-
-    %% -------------------------------------------------------------------------
-    %% FLOW 2: BATCH DATA FLOW (Offline) - Green Lines
-    %% -------------------------------------------------------------------------
-    Airflow -->|2.1 Trigger ETL DAGs| SparkEngine
-    DeltaBronze -->|2.2 Read Raw Data (Parquet/Delta)| SparkEngine
-    SparkEngine -->|2.3 Write Delta Tables| DeltaGold
-    DeltaGold -->|2.4 Sync Gold Tables| PostgresDW
-
-    %% -------------------------------------------------------------------------
-    %% FLOW 3: SERVING / ANALYTICS FLOW (User Query) - Orange Line
-    %% -------------------------------------------------------------------------
-    PostgresDW -->|3.1 SQL Query / Analytics| Analyst
-
-    %% -------------------------------------------------------------------------
-    %% FLOW 4: GOVERNANCE & METADATA FLOW (Lineage & Quality) - Dashed Purple Lines
-    %% -------------------------------------------------------------------------
-    DeltaBronze -.-|4.1 Metadata & Lineage| DataHub
-    DeltaGold -.-|4.1 Metadata & Lineage| DataHub
-    PostgresDW -.-|4.1 Metadata & Lineage| DataHub
-```
-
 ### Architecture Principles & Rubric Compliance
+
 1. **Deployable Units Only:** Every box represents an independently deployable container, cluster service, or external UI (`Data Generator Service (Docker)`, `Apache Kafka Broker (Docker)`, `Apache Airflow Orchestrator (Docker)`, `PostgreSQL Data Warehouse (Docker)`, `DataHub Data Governance Platform (Docker)`, etc.). Embedded libraries/SDKs (Feast SDK, Pydantic, Great Expectations) execute inside the container processes and are omitted as separate boxes.
 2. **Data Flow & Arrow Directions:** Arrows strictly follow data transmission direction with explicit payload labels on arrow badges (`1.1 Credit Events (JSON)`, `1.2 Streaming Events`, `2.2 Read Raw Data (Parquet/Delta)`, `3.1 SQL Query / Analytics`, `4.1 Metadata & Lineage`).
 3. **Numbered Multi-Flow Lineage:** Distinct color-coded flows with step numbers demarcate platform operations:
