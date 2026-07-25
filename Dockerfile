@@ -32,4 +32,4 @@ RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
 COPY . .
 
 # Execute the data generator script
-CMD ["python", "generators/credit_events.py"]
+CMD ["python", "generators/online_stream_gen.py"]
