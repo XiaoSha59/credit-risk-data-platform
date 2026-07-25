@@ -1,5 +1,12 @@
-from airflow import DAG
-from airflow.operators.python import PythonOperator
+try:
+    from airflow import DAG
+    from airflow.operators.python import PythonOperator
+    AIRFLOW_AVAILABLE = True
+except Exception:
+    AIRFLOW_AVAILABLE = False
+    DAG = object
+    PythonOperator = object
+
 from datetime import datetime, timedelta
 import sys
 import os
@@ -7,7 +14,9 @@ import os
 # Add root directory to python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from storage.data_quality_gate import run_data_quality_gate
+from Novel_idea.data_quality_gate import run_data_quality_gate
+
+
 
 default_args = {
     'owner': 'credit_risk_team',
@@ -30,33 +39,44 @@ def task_transform_silver():
 def task_gold_dw_sync():
     print("[*] Task 4: Synchronizing Gold Zone to PostgreSQL Data Warehouse...")
 
-with DAG(
-    'credit_risk_dp2_quality_gate',
-    default_args=default_args,
-    description='Pipeline featuring blocking Data Quality Gate before Silver transformation',
-    schedule_interval=None,
-    catchup=False
-) as dag:
+if AIRFLOW_AVAILABLE:
+    with DAG(
+        'credit_risk_dp2_quality_gate',
+        default_args=default_args,
+        description='Pipeline featuring blocking Data Quality Gate before Silver transformation',
+        schedule_interval=None,
+        catchup=False
+    ) as dag:
 
-    ingest_bronze = PythonOperator(
-        task_id='ingest_bronze',
-        python_callable=task_ingest_bronze
-    )
+        ingest_bronze = PythonOperator(
+            task_id='ingest_bronze',
+            python_callable=task_ingest_bronze
+        )
 
-    data_quality_check = PythonOperator(
-        task_id='data_quality_check',
-        python_callable=task_data_quality_check
-    )
+        data_quality_check = PythonOperator(
+            task_id='data_quality_check',
+            python_callable=task_data_quality_check
+        )
 
-    transform_silver = PythonOperator(
-        task_id='transform_silver',
-        python_callable=task_transform_silver
-    )
+        transform_silver = PythonOperator(
+            task_id='transform_silver',
+            python_callable=task_transform_silver
+        )
 
-    gold_dw_sync = PythonOperator(
-        task_id='gold_dw_sync',
-        python_callable=task_gold_dw_sync
-    )
+        gold_dw_sync = PythonOperator(
+            task_id='gold_dw_sync',
+            python_callable=task_gold_dw_sync
+        )
 
-    # DAG Dependency Chain with Quality Gate Blocking
-    ingest_bronze >> data_quality_check >> transform_silver >> gold_dw_sync
+        # DAG Dependency Chain with Quality Gate Blocking
+        ingest_bronze >> data_quality_check >> transform_silver >> gold_dw_sync
+
+
+if __name__ == '__main__':
+    print("[*] Testing Airflow DAG task execution standalone:")
+    task_ingest_bronze()
+    task_data_quality_check()
+    task_transform_silver()
+    task_gold_dw_sync()
+    print("[+] Airflow Quality Gate DAG Tasks Executed Successfully!")
+

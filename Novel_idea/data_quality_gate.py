@@ -24,8 +24,9 @@ def run_data_quality_gate(simulate_anomaly=False):
     all_passed = passed_rule1 and passed_rule2
 
     # Generate HTML Data Docs Report
-    os.makedirs("d:/credit-risk-data-platform/docs/reports", exist_ok=True)
-    report_path = "d:/credit-risk-data-platform/docs/reports/data_quality_report.html"
+    os.makedirs("d:/credit-risk-data-platform/Novel_idea/reports", exist_ok=True)
+    report_path = "d:/credit-risk-data-platform/Novel_idea/reports/data_quality_report.html"
+
 
     status_color = "#22C55E" if all_passed else "#EF4444"
     status_text = "PASSED (GREEN)" if all_passed else "FAILED (RED) — PIPELINE HALTED"
