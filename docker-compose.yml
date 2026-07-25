@@ -1,0 +1,60 @@
+version: '3.8'
+
+# ==============================================================================
+# CREDIT RISK DATA PLATFORM - LOCAL CLUSTER CONFIGURATION
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. FOUNDATIONAL INFRASTRUCTURE
+  # ----------------------------------------------------------------------------
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: platform-zookeeper
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports:
+      - "2181:2181"
+    networks:
+      - credit-risk-network
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: platform-kafka
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    networks:
+      - credit-risk-network
+
+  # ----------------------------------------------------------------------------
+  # 2. CUSTOM DATA GENERATOR
+  # ----------------------------------------------------------------------------
+  data-generator:
+    container_name: platform-data-generator
+    build:
+      context: .
+      dockerfile: Dockerfile # Points to the Optimized Multi-stage Dockerfile
+    volumes:
+      # Mount local directory to container for rapid development without rebuilds
+      - .:/app
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - ENVIRONMENT=development
+    depends_on:
+      - kafka
+    networks:
+      - credit-risk-network
+
+# ==============================================================================
+# NETWORK DEFINITION
+# ==============================================================================
+networks:
+  credit-risk-network:
+    driver: bridge
