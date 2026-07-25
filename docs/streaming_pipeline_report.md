@@ -2,9 +2,9 @@
 
 ---
 
-## PHẦN 1: HƯỚNG DẪN CHẠY ONLINE STREAMING
+## PART 1: ONLINE STREAMING EXECUTION GUIDE
 
-### 1.1 Kiến trúc tổng thể
+### 1.1 Overall Architecture
 
 ```
 Kafka Producer (send_stream_data.py)
@@ -28,35 +28,35 @@ Flink Job   Flink Job
 
 ---
 
-### 1.2 Khởi động Kafka & Zookeeper (Docker)
+### 1.2 Start Kafka & Zookeeper (Docker)
 
-**Bước 1: Khởi động toàn bộ infrastructure**
+**Step 1: Start full infrastructure**
 
 ```powershell
-# Tại thư mục gốc dự án
+# At project root directory
 docker-compose up -d
 ```
 
-**Bước 2: Xác nhận containers đang chạy**
+**Step 2: Confirm containers are running**
 
 ```powershell
 docker ps
 ```
 
-Kết quả mong đợi:
+Expected output:
 ```
 CONTAINER ID   IMAGE                            PORTS                    NAMES
 xxxxxxxxxxxx   confluentinc/cp-kafka:7.3.0      0.0.0.0:9092->9092/tcp   platform-kafka
 xxxxxxxxxxxx   confluentinc/cp-zookeeper:7.3.0  0.0.0.0:2181->2181/tcp   platform-zookeeper
 ```
 
-**Bước 3: Kiểm tra Kafka topic**
+**Step 3: Check Kafka topic**
 
 ```powershell
-# Liệt kê các topics hiện có
+# List existing topics
 docker exec -it platform-kafka kafka-topics --list --bootstrap-server localhost:9092
 
-# (Tùy chọn) Tạo topic thủ công nếu chưa tồn tại
+# (Optional) Manually create topic if it does not exist yet
 docker exec -it platform-kafka kafka-topics \
   --create --topic credit_risk_events \
   --bootstrap-server localhost:9092 \
@@ -65,16 +65,16 @@ docker exec -it platform-kafka kafka-topics \
 
 ---
 
-### 1.3 Chạy Flink Baseline Job
+### 1.3 Run Flink Baseline Job
 
 > **File:** `streaming/flink_baseline_job.py`
 
 ```powershell
-# Terminal 1 — Khởi động Baseline Job
+# Terminal 1 — Start Baseline Job
 .venv\Scripts\python.exe streaming/flink_baseline_job.py
 ```
 
-**Kết quả khởi động thành công:**
+**Successful startup result:**
 ```
 [*] Loaded Kafka connector JAR: file:///D:/credit-risk-data-platform/plugins/...
 
@@ -84,22 +84,22 @@ docker exec -it platform-kafka kafka-topics \
 ```
 
 - Flink Web UI: **http://localhost:8081**
-- Window: `TumblingProcessingTimeWindows` — **30 giây**
+- Window: `TumblingProcessingTimeWindows` — **30 seconds**
 - Consumer group: `credit_risk_baseline_group`
-- Không có risk classification, không có checkpointing
+- No risk classification, no checkpointing
 
 ---
 
-### 1.4 Chạy Flink Optimized Job
+### 1.4 Run Flink Optimized Job
 
 > **File:** `streaming/flink_optimzed_job.py`
 
 ```powershell
-# Terminal 2 — Khởi động Optimized Job (có thể chạy song song Baseline)
+# Terminal 2 — Start Optimized Job (can run concurrently with Baseline)
 .venv\Scripts\python.exe streaming/flink_optimzed_job.py
 ```
 
-**Kết quả khởi động thành công:**
+**Successful startup result:**
 ```
 [*] Loaded Kafka connector JAR: file:///D:/...
 
@@ -109,23 +109,23 @@ docker exec -it platform-kafka kafka-topics \
 ============================================================
 ```
 
-- Flink Web UI: **http://localhost:8081** (hoặc `:8082` nếu port 8081 đã bị chiếm)
-- Window: `TumblingProcessingTimeWindows` — **60 giây**
+- Flink Web UI: **http://localhost:8081** (or `:8082` if port 8081 is occupied)
+- Window: `TumblingProcessingTimeWindows` — **60 seconds**
 - Consumer group: `credit_risk_optimized_group`
-- Có risk classification (`HIGH/MEDIUM/LOW`), có checkpointing 10 giây
+- Features risk classification (`HIGH/MEDIUM/LOW`), 10-second checkpointing
 
 ---
 
-### 1.5 Bắn dữ liệu vào Kafka để test
+### 1.5 Send Data to Kafka for Testing
 
 > **File:** `generators/send_stream_data.py`
 
 ```powershell
-# Terminal 3 — Bắn 100 events vào Kafka (0.5s/event)
+# Terminal 3 — Produce 100 events to Kafka (0.5s/event)
 .venv\Scripts\python.exe generators/send_stream_data.py
 ```
 
-**Kết quả:**
+**Result:**
 ```
 [*] Connecting to Kafka at localhost:9092...
 [+] Starting event producer... Sending 100 events to topic 'credit_risk_events'
@@ -136,40 +136,40 @@ docker exec -it platform-kafka kafka-topics \
 [+] Done sending streaming events!
 ```
 
-**Format payload:** `customer_id,loan_amount,unix_timestamp`
+**Payload format:** `customer_id,loan_amount,unix_timestamp`
 
 ---
 
-### 1.6 Xem kết quả trên Flink Web UI
+### 1.6 View Results on Flink Web UI
 
-1. Mở trình duyệt tại **http://localhost:8081**
-2. Chọn tab **"Jobs"** → **"Running Jobs"**
-3. Click vào tên job để xem DAG (Directed Acyclic Graph)
-4. Các operator màu **xanh lá** = đang chạy bình thường
-5. Xem output logs qua tab **"Task Managers"** → **"Stdout"**
-
----
+1. Open browser at **http://localhost:8081**
+2. Select tab **"Jobs"** → **"Running Jobs"**
+3. Click on the job name to view the DAG (Directed Acyclic Graph)
+4. **Green** operators = running normally
+5. View output logs via tab **"Task Managers"** → **"Stdout"**
 
 ---
 
-## PHẦN 2: KẾT QUẢ & PHÂN TÍCH
+---
+
+## PART 2: RESULTS & ANALYSIS
 
 ---
 
-### 2.1 Baseline — Không có tối ưu hóa
+### 2.1 Baseline — Unoptimized Version
 
-#### Mô tả
+#### Description
 
-Baseline job là phiên bản đơn giản nhất: kết nối trực tiếp Kafka và xử lý dữ liệu theo cửa sổ thời gian xử lý (Processing-Time), không có bất kỳ cơ chế xử lý lỗi, phân loại rủi ro, hay fault tolerance nào.
+The Baseline job is the simplest implementation: it connects directly to Kafka and processes data using Processing-Time windows without any error handling, risk classification, or fault tolerance mechanisms.
 
-#### Code Baseline
+#### Baseline Code Snippet
 
 ```python
-# streaming/flink_baseline_job.py — Đoạn xử lý chính
+# streaming/flink_baseline_job.py — Core processing section
 
-# Không có checkpointing
-# Không có risk classification
-# Không có watermark hay xử lý late arrival
+# No checkpointing
+# No risk classification
+# No watermarks or late arrival handling
 
 result_stream = stream \
     .map(lambda x: evaluate_risk_payload(x)) \
@@ -179,163 +179,163 @@ result_stream = stream \
         'customer_id': a['customer_id'],
         'total_loan_amount': a['total_loan_amount'] + b['total_loan_amount'],
         'max_timestamp': max(a['max_timestamp'], b['max_timestamp'])
-        # Không có risk_level
+        # No risk_level
     })
 
 result_stream.print()
 ```
 
-#### Hạn chế của Baseline
+#### Baseline Limitations
 
-| Vấn đề | Biểu hiện |
+| Issue | Symptom / Description |
 |---|---|
-| **Không xử lý data burst** | Nhiều events đến đồng loạt, baseline xử lý tuần tự không kiểm soát tải |
-| **Không phân loại rủi ro** | Output chỉ có `total_loan_amount`, không biết HIGH/MEDIUM/LOW |
-| **Không checkpoint** | Nếu job crash, toàn bộ state bị mất, phải đọc lại từ đầu |
-| **Window ngắn (30s)** | Dữ liệu đến trễ vài giây sẽ bị bỏ qua hoàn toàn |
-| **Output thô** | `{'customer_id': 'CUST-1001', 'total_loan_amount': 17000000.0, 'max_timestamp': 1785007291}` |
+| **No data burst handling** | When high volumes of events arrive simultaneously, baseline processes sequentially without load control |
+| **No risk classification** | Output only contains `total_loan_amount`, lacking HIGH/MEDIUM/LOW risk categorization |
+| **No checkpointing** | If job crashes, all state is lost and must re-consume from scratch |
+| **Short window (30s)** | Data arriving a few seconds late is completely ignored |
+| **Raw output format** | `{'customer_id': 'CUST-1001', 'total_loan_amount': 17000000.0, 'max_timestamp': 1785007291}` |
 
 ---
 
-### 2.2 Handle Data Burst — Xử lý luồng dữ liệu đột biến
+### 2.2 Handle Data Burst — Managing Spike Traffic
 
-#### Vấn đề
+#### Issue
 
-Trong môi trường tín dụng thực tế, luồng dữ liệu không đồng đều — có những thời điểm hàng chục giao dịch đến trong vài giây (burst), khiến hệ thống quá tải.
+In real-world credit applications, data traffic is unpredictable — dozens of transactions can arrive within seconds (bursts), overloading the processing pipeline.
 
-**Biểu hiện trên Flink Web UI:**
-- Operator backpressure màu vàng/đỏ khi burst
-- Queue đầy, latency tăng đột biến
-- Với baseline: events bị drop hoặc xử lý sai thứ tự
+**Symptoms on Flink Web UI:**
+- Operator backpressure indicator turns yellow/red during bursts
+- Buffer queue fills up, causing latency spikes
+- Baseline behavior: events dropped or processed out of order
 
-#### Giải pháp trong Optimized Job
+#### Solution in Optimized Job
 
-**1. Tăng kích thước window — Buffer hấp thụ burst:**
+**1. Increased window size — Buffer to absorb bursts:**
 ```python
-# Baseline: 30 giây — dễ tràn khi burst
+# Baseline: 30 seconds — prone to overflow during bursts
 .window(TumblingProcessingTimeWindows.of(Time.seconds(30)))
 
-# Optimized: 60 giây — window rộng hơn hấp thụ tốt burst traffic
+# Optimized: 60 seconds — wider window absorbs burst traffic effectively
 .window(TumblingProcessingTimeWindows.of(Time.seconds(60)))
 ```
 
-**2. Reduce function tích lũy state trong window — Không emit từng event rời:**
+**2. Reduce function accumulates state inside window — No per-event emission:**
 ```python
-# Không emit mỗi event riêng lẻ — chờ window đóng rồi mới emit kết quả tổng hợp
+# Does not emit individual events — waits for window evaluation before emitting aggregated result
 .reduce(lambda a, b: {
     'customer_id': a['customer_id'],
-    'total_loan_amount': a['total_loan_amount'] + b['total_loan_amount'],  # Cộng dồn
+    'total_loan_amount': a['total_loan_amount'] + b['total_loan_amount'],  # Accumulating sum
     'max_timestamp': max(a['max_timestamp'], b['max_timestamp']),
     'risk_level': merge_risk(a['total_loan_amount'] + b['total_loan_amount'])
 })
 ```
 
-**Kết quả:** Thay vì emit 30 events rời rạc khi burst, job chờ window 60s đóng và emit **1 bản tổng hợp duy nhất** per customer — giảm downstream load đáng kể.
+**Result:** Instead of emitting 30 individual events during a burst, the job waits for the 60s window closure and emits **1 single aggregated record** per customer — significantly reducing downstream load.
 
 ---
 
-### 2.3 Handle Late Arrival — Xử lý dữ liệu đến trễ
+### 2.3 Handle Late Arrival — Managing Out-of-Order & Delayed Data
 
-#### Vấn đề
+#### Issue
 
-Trong hệ thống phân tán, giao dịch có thể đến Kafka muộn hơn thời gian thực tế do:
+In distributed systems, transactions may arrive at Kafka later than their actual event time due to:
 - Network latency
-- Retry từ mobile client
-- Message queue backlog
+- Retries from mobile clients
+- Message queue backlogs
 
-**Baseline không xử lý late arrival:** Events đến sau khi window đã đóng sẽ bị bỏ qua hoàn toàn.
+**Baseline does not handle late arrivals:** Events arriving after the window has closed are completely discarded.
 
-#### Giải pháp trong Optimized Job
+#### Solution in Optimized Job
 
-**Window rộng hơn = tự nhiên hấp thụ late events:**
+**Wider window = Natural absorption of late events:**
 ```python
-# Cửa sổ 60s cho phép events đến trễ tối đa ~30s vẫn được gom đúng window
+# 60-second window allows events arriving up to ~30s late to still be grouped into the correct window
 .window(TumblingProcessingTimeWindows.of(Time.seconds(60)))
 ```
 
-**Ghi nhận timestamp từ payload event (không dùng wall clock):**
+**Extract event timestamp from payload (avoiding system wall-clock):**
 ```python
 def evaluate_risk_payload(raw_event: str):
     parts = raw_event.strip().split(",")
-    timestamp = int(parts[2])   # Dùng timestamp từ event, không phải thời điểm Flink nhận
+    timestamp = int(parts[2])   # Extract timestamp from event payload, not Flink ingestion time
 
     return {
         'customer_id': customer_id,
         'total_loan_amount': loan_amount,
-        'max_timestamp': timestamp,   # Giữ lại event-time gốc để tracing
+        'max_timestamp': timestamp,   # Retain original event-time for tracing
         'risk_level': risk_level,
     }
 ```
 
-**Aggregation dùng `max_timestamp`** thay vì processing time:
+**Aggregation using `max_timestamp`** instead of processing time:
 ```python
 'max_timestamp': max(a['max_timestamp'], b['max_timestamp'])
-# Luôn lấy timestamp mới nhất trong window — đại diện cho thời điểm giao dịch thực tế
+# Always keeps the newest timestamp in window — representing actual latest transaction time
 ```
 
-> **Lưu ý kỹ thuật:** PyFlink Python SDK (Beam-based) không hỗ trợ `allowed_lateness()` trực tiếp trên Python operator path (`window_operator.py` sẽ raise `TypeError: int + Time`). Giải pháp dùng window rộng hơn là cách tiếp cận ổn định nhất với PyFlink.
+> **Technical Note:** The PyFlink Python SDK (Beam-based) does not directly support `allowed_lateness()` on Python operator paths (`window_operator.py` raises `TypeError: int + Time`). Utilizing a wider window is the most stable approach in PyFlink.
 
 ---
 
-### 2.4 Handle Other Streaming Problems — Các vấn đề streaming khác
+### 2.4 Handle Other Streaming Problems
 
-#### Vấn đề 1: Fault Tolerance (Chịu lỗi)
+#### Problem 1: Fault Tolerance
 
-**Baseline:** Không có checkpointing → crash = mất toàn bộ state.
+**Baseline:** No checkpointing → crash = total state loss.
 
-**Optimized Fix — Bật Checkpointing:**
+**Optimized Fix — Enable Checkpointing:**
 ```python
-# Tự động lưu state mỗi 10 giây vào local filesystem
-env.enable_checkpointing(10000)   # 10,000ms = 10 giây
+# Automatically save state every 10 seconds to local filesystem
+env.enable_checkpointing(10000)   # 10,000ms = 10 seconds
 ```
 
-Nếu job bị crash và restart, Flink khôi phục từ checkpoint gần nhất, không mất dữ liệu đã xử lý.
+If the job crashes and restarts, Flink recovers state from the latest checkpoint without losing processed data.
 
 ---
 
-#### Vấn đề 2: Port Conflict khi chạy 2 jobs song song
+#### Problem 2: Port Conflict When Running 2 Parallel Jobs
 
-**Baseline gặp lỗi:** Cả 2 jobs cùng cố bind port `8081` → `BindException`.
+**Baseline issue:** Both jobs attempt to bind to port `8081` → `BindException`.
 
 **Optimized Fix — Dynamic Port Range:**
 ```python
 config = Configuration()
 config.set_string("rest.address", "localhost")
-config.set_string("rest.port", "8081-8090")   # Tự động chọn port trống trong range
+config.set_string("rest.port", "8081-8090")   # Automatically pick available port in range
 ```
 
-Kết quả: Baseline dùng `:8081`, Optimized tự động bind `:8082` → 2 jobs chạy song song được.
+Result: Baseline uses `:8081`, Optimized automatically binds to `:8082` → Both jobs run concurrently without conflicts.
 
 ---
 
-#### Vấn đề 3: Python Worker Runtime Error
+#### Problem 3: Python Worker Runtime Error
 
-**Baseline gặp lỗi:** Flink JVM cố gọi `python` system nhưng không tìm được `.venv`.
+**Baseline issue:** Flink JVM attempts to invoke system `python` executable but cannot locate the `.venv`.
 
-**Optimized Fix — Chỉ định Python executable rõ ràng:**
+**Optimized Fix — Explicitly Specify Python Executable:**
 ```python
 import sys
 env.set_python_executable(sys.executable)
-# Trỏ JVM Flink worker đúng vào: D:\credit-risk-data-platform\.venv\Scripts\python.exe
+# Explicitly points Flink JVM worker to: D:\credit-risk-data-platform\.venv\Scripts\python.exe
 ```
 
 ---
 
-#### Vấn đề 4: Risk Classification — Business Logic
+#### Problem 4: Risk Classification — Business Logic Integration
 
-**Baseline:** Chỉ tổng hợp số liệu thô, không có logic nghiệp vụ.
+**Baseline:** Only aggregates raw metrics, lacking business logic.
 
-**Optimized Fix — Phân loại rủi ro ngay trong pipeline:**
+**Optimized Fix — In-Pipeline Risk Classification:**
 ```python
 def merge_risk(total_amount):
-    if total_amount >= 10_000_000:   # >= 10 triệu VND
+    if total_amount >= 10_000_000:   # >= 10 Million VND
         return "HIGH"
-    elif total_amount >= 3_000_000:  # >= 3 triệu VND
+    elif total_amount >= 3_000_000:  # >= 3 Million VND
         return "MEDIUM"
     return "LOW"
 ```
 
-Output dùng được ngay cho downstream systems (Feature Store, alert systems):
+Output is immediately actionable for downstream systems (Feature Store, alert systems):
 ```
 [WINDOW RESULT] Customer: CUST-1001     | Total Loan:   29,000,000 VND | Risk: HIGH
 [WINDOW RESULT] Customer: CUST-1003     | Total Loan:    1,500,000 VND | Risk: LOW
@@ -344,40 +344,40 @@ Output dùng được ngay cho downstream systems (Feature Store, alert systems)
 
 ---
 
-### 2.5 Window Processing — Xử lý cửa sổ trong Flink
+### 2.5 Window Processing in Flink
 
-#### Khái niệm Window trong Flink
+#### Window Concepts in Flink
 
-Window là cơ chế gom nhóm luồng dữ liệu vô hạn thành các tập con hữu hạn để xử lý theo batch logic trên stream.
+A window is a mechanism that divides infinite data streams into finite chunks to apply batch computations over stream data.
 
-| Loại Window | Mô tả | Dùng khi |
+| Window Type | Description | Best Use Case |
 |---|---|---|
-| `TumblingProcessingTimeWindows` | Cửa sổ cố định theo thời gian xử lý | Cần đơn giản, không cần event-time |
-| `TumblingEventTimeWindows` | Cửa sổ cố định theo thời gian sự kiện | Cần đảm bảo thứ tự event-time |
-| `SlidingProcessingTimeWindows` | Cửa sổ trượt (overlap) | Cần tính toán liên tục hơn |
-| `SessionWindows` | Cửa sổ theo phiên hoạt động | Phân tích session user |
+| `TumblingProcessingTimeWindows` | Fixed-size window based on processing time | Simple setups, non-critical event time order |
+| `TumblingEventTimeWindows` | Fixed-size window based on event time | Strict event-time order guarantees |
+| `SlidingProcessingTimeWindows` | Overlapping sliding window | Continuous rolling metrics |
+| `SessionWindows` | Activity gap-based window | User session analytics |
 
-#### Code thể hiện Window Processing hoàn chỉnh
+#### Complete Code Demonstration of Window Processing
 
 ```python
 # ============================================================
-# WINDOW PIPELINE HOÀN CHỈNH — streaming/flink_optimzed_job.py
+# COMPLETE WINDOW PIPELINE — streaming/flink_optimzed_job.py
 # ============================================================
 
-# BƯỚC 1: Đọc từ Kafka source
+# STEP 1: Read from Kafka source
 stream = env.from_source(
     kafka_source,
     WatermarkStrategy.no_watermarks(),
     "Kafka_Credit_Risk_Source"
 )
 
-# BƯỚC 2: Parse & enrich mỗi event
+# STEP 2: Parse & enrich each event
 parsed_stream = stream.map(evaluate_risk_payload)
 # Input:  "CUST-1001,12000000,1785007291"
 # Output: {'customer_id': 'CUST-1001', 'total_loan_amount': 12000000.0,
 #          'max_timestamp': 1785007291, 'risk_level': 'HIGH'}
 
-# BƯỚC 3: Keyed Window Aggregation
+# STEP 3: Keyed Window Aggregation
 aggregated_stream = parsed_stream \
     .key_by(lambda x: x['customer_id']) \
     .window(TumblingProcessingTimeWindows.of(Time.seconds(60))) \
@@ -388,7 +388,7 @@ aggregated_stream = parsed_stream \
         'risk_level': merge_risk(a['total_loan_amount'] + b['total_loan_amount'])
     })
 
-# BƯỚC 4: Sink — Format và in kết quả
+# STEP 4: Sink — Format and print results
 aggregated_stream \
     .map(lambda x: (
         f"[WINDOW RESULT] Customer: {x['customer_id']:12s} | "
@@ -398,21 +398,21 @@ aggregated_stream \
     .print()
 ```
 
-#### Ví dụ kết quả sau khi window đóng
+#### Output Example After Window Closure
 
-**Events trong 60 giây của CUST-1001:**
+**Events within a 60-second window for CUST-1001:**
 ```
 Input:  CUST-1001,12000000,1785007291   → risk: HIGH
 Input:  CUST-1001, 5000000,1785007292   → risk: MEDIUM
 Input:  CUST-1001,12000000,1785007293   → risk: HIGH
 ```
 
-**Sau 60 giây, Flink emit kết quả tổng hợp:**
+**After 60 seconds, Flink emits the aggregated result:**
 ```
 [WINDOW RESULT] Customer: CUST-1001     | Total Loan:   29,000,000 VND | Risk: HIGH
 ```
 
-#### DAG trên Flink Web UI
+#### DAG Visual on Flink Web UI
 
 **Baseline DAG** (`http://localhost:8081`):
 ```
@@ -431,63 +431,22 @@ Source: Kafka_Credit_Risk_Source
     → Sink: Print to Std. Out
 ```
 
-> Khi bắn `send_stream_data.py`, các operator chuyển từ `IDLE` sang `RUNNING` (màu xanh lá). Window operator giữ state cho đến khi window time kết thúc, sau đó emit kết quả và reset state cho window tiếp theo.
+> When executing `send_stream_data.py`, operator states transition from `IDLE` to `RUNNING` (green). The window operator retains state until the window time elapses, after which it emits the result and resets state for the next window.
 
 ---
 
-### 2.6 Bảng tổng kết so sánh Baseline vs Optimized
+### 2.6 Summary Comparison Table: Baseline vs Optimized
 
-| Tiêu chí | Baseline | Optimized |
+| Metric / Feature | Baseline | Optimized |
 |---|---|---|
-| **Window size** | 30 giây | 60 giây |
-| **Risk classification** | ❌ Không có | ✅ HIGH / MEDIUM / LOW |
-| **Checkpointing** | ❌ Không có | ✅ Mỗi 10 giây |
-| **Fault tolerance** | ❌ Mất state khi crash | ✅ Khôi phục từ checkpoint |
-| **Output format** | Dict thô | Chuỗi formatted dễ đọc |
-| **Dynamic REST port** | ❌ Fixed 8081 | ✅ Range 8081-8090 |
-| **Burst handling** | ❌ Xử lý từng event | ✅ Gom qua window lớn hơn |
-| **Late arrival tolerance** | ❌ Bỏ qua | ✅ Window rộng hấp thụ tự nhiên |
-| **Consumer group** | `credit_risk_baseline_group` | `credit_risk_optimized_group` |
+| **Window Size** | 30 seconds | 60 seconds |
+| **Risk Classification** | ❌ None | ✅ HIGH / MEDIUM / LOW |
+| **Checkpointing** | ❌ None | ✅ Every 10 seconds |
+| **Fault Tolerance** | ❌ Loses state on crash | ✅ Recovers from checkpoint |
+| **Output Format** | Raw dictionary | Clean formatted string |
+| **Dynamic REST Port** | ❌ Fixed 8081 | ✅ Range 8081-8090 |
+| **Burst Handling** | ❌ Processes per event | ✅ Aggregates via larger window |
+| **Late Arrival Tolerance** | ❌ Discarded | ✅ Absorbed by wider window |
+| **Consumer Group** | `credit_risk_baseline_group` | `credit_risk_optimized_group` |
 
 ---
-
----
-
-## PHẦN 3: SO SÁNH STORAGE BASELINE VS OPTIMIZED LAKEHOUSE
-
-### 3.1 Baseline Storage (`storage/baseline_storage.py`)
-
-- **Định dạng lưu trữ:** Parquet thuần (`data/raw/credit_risk_parquet/`).
-- **Phương thức ghi:** `append`.
-- **Đặc điểm & Hạn chế:**
-  1. **Tạo ra nhiều file nhỏ (Small File Problem):** Mỗi lần micro-batch hoặc stream append dữ liệu, một file Parquet nhỏ sẽ được ghi. Qua thời gian, số lượng file nhỏ tăng đột biến làm giảm hiệu năng truy vấn (Small File Problem).
-  2. **Không phân vùng (Unpartitioned):** Dữ liệu lưu chung một thư mục. Truy vấn lọc theo ngày phải quét toàn bộ tập dữ liệu (Full Table Scan).
-  3. **Không hỗ trợ ACID Transactions:** Ghi/đọc đồng thời có thể gây lỗi dữ liệu không đồng nhất hoặc dở dang.
-
----
-
-### 3.2 Optimized Lakehouse (`storage/optimized_lakehouse.py`)
-
-- **Định dạng lưu trữ:** Delta Lake (`data/lakehouse/credit_risk_delta/`).
-- **Phương thức & Kỹ thuật tối ưu:**
-  1. **Partitioning theo `event_date` (`.partitionBy("event_date")`):**
-     - Giúp Spark kích hoạt **Partition Pruning** — chỉ đọc đúng folder ngày cần truy vấn, bỏ qua 90%+ dữ liệu dư thừa.
-  2. **Compaction (`deltaTable.optimize().executeCompaction()`):**
-     - Tự động gom hàng ngàn file Parquet nhỏ thành các file lớn chuẩn (thường 128MB - 1GB), giải quyết triệt để lỗi Small File Problem.
-  3. **Z-Order Clustering (`deltaTable.optimize().executeZOrderBy("customer_id")`):**
-     - Sắp xếp lại dữ liệu theo chiều không gian đa chiều (Multi-dimensional Clustering) dựa trên `customer_id`.
-     - Cho phép **Data Skipping** ở mức độ chi tiết (file statistics min/max), tối ưu tốc độ đọc khi lọc thông tin khách hàng.
-  4. **Hỗ trợ ACID & Time Travel:** Đảm bảo tính toàn vẹn dữ liệu khi có nhiều tiến trình cùng đọc/ghi.
-
----
-
-### 3.3 Bảng so sánh Storage Baseline vs Storage Optimized
-
-| Tiêu chí | Storage Baseline (`baseline_storage.py`) | Storage Optimized (`optimized_lakehouse.py`) |
-|---|---|---|
-| **Định dạng (Format)** | Parquet thuần | Delta Lake |
-| **Phân vùng (Partitioning)** | ❌ Không (Unpartitioned) | ✅ Có (`partitionBy("event_date")`) |
-| **Quản lý file nhỏ** | ❌ Bị Small File Problem | ✅ Compaction (`executeCompaction()`) |
-| **Tốc độ truy vấn Khách hàng** | ❌ Full Table Scan | ✅ Z-Order Clustering (`customer_id`) |
-| **Tính toàn vẹn (ACID)** | ❌ Không hỗ trợ | ✅ ACID Transactions & Time Travel |
-

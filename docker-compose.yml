@@ -47,6 +47,24 @@ services:
       - credit-risk-network
 
   # ----------------------------------------------------------------------------
+  # 2. DATA WAREHOUSE (POSTGRESQL - for DBeaver schema visualization)
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: credit_risk_postgres
+    environment:
+      POSTGRES_USER: creditrisk
+      POSTGRES_PASSWORD: creditrisk123
+      POSTGRES_DB: credit_risk_dw
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docs/sql/schema_setup.sql:/docker-entrypoint-initdb.d/schema_setup.sql
+    networks:
+      - credit-risk-network
+
+  # ----------------------------------------------------------------------------
   # 3. ORCHESTRATION INFRASTRUCTURE (AIRFLOW)
   # ----------------------------------------------------------------------------
   airflow:
@@ -70,3 +88,6 @@ services:
 networks:
   credit-risk-network:
     driver: bridge
+
+volumes:
+  postgres_data:
