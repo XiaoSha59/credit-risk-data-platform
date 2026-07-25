@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Great Expectations Data Quality Report</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0F172A; color: #F8FAFC; padding: 30px; }
+        .header { background-color: #1E293B; padding: 20px; border-radius: 10px; border-left: 6px solid #EF4444; }
+        .status { font-size: 24px; fontweight: bold; color: #EF4444; }
+        .metric-card { background-color: #1E293B; padding: 15px; margin-top: 15px; border-radius: 8px; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background-color: #334155; color: #38BDF8; }
+        .pass { color: #22C55E; fontweight: bold; }
+        .fail { color: #EF4444; fontweight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Data Quality Validation Report</h1>
+        <div class="status">Overall Status: FAILED (RED) — PIPELINE HALTED</div>
+        <p>Target Table: <code>stg_exposure_at_default</code> | Execution Time: 2026-07-26 06:39:30</p>
+    </div>
+
+    <div class="metric-card">
+        <h3>Evaluation Summary</h3>
+        <p>Total Rows Scanned: <b>15,000</b></p>
+        <p>Evaluated Rules: <b>2</b> | Passed: <b>0</b> | Failed: <b>2</b></p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Rule ID</th>
+                <th>Assertion Description</th>
+                <th>Threshold</th>
+                <th>Observed Value</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>RULE-01</td>
+                <td>expect_column_values_to_be_between(ead_amount)</td>
+                <td>min_value >= 0.00 VND</td>
+                <td>-1,500,000.00 VND</td>
+                <td class="fail">FAIL</td>
+            </tr>
+            <tr>
+                <td>RULE-02</td>
+                <td>expect_column_null_rate_to_be_between(customer_id)</td>
+                <td>max_null_rate <= 5.0%</td>
+                <td>12.0%</td>
+                <td class="fail">FAIL</td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>
