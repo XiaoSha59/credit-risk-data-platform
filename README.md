@@ -20,7 +20,7 @@ The core business domain of this platform is **Credit Risk Management & Analytic
 In banking and quantitative risk frameworks (e.g., Basel II/III), accurately monitoring credit transactions and calculating risk metrics — such as **Probability of Default (PD)**, **Loss Given Default (LGD)**, and **Exposure at Default (EAD)** — requires both low-latency real-time detection and high-throughput batch analytics.
 
 This enterprise data platform implements a hybrid Lambda/Kappa-inspired architecture:
-- **Real-Time Streaming:** Captures credit transaction events via **Kafka** and processes 60-second window aggregations with risk classification (`HIGH`, `MEDIUM`, `LOW`) using **PyFlink**.
+- **Real-Time Streaming & MinIO External Storage:** Captures credit transaction events via **Kafka** (PyFlink 60-second window aggregations with risk classification) and simulates external department batch streaming ingestion via **MinIO S3** (`external-streaming-source` bucket into Bronze Zone).
 - **Offline Medallion Lakehouse:** Ingests raw data into a multi-zone **Delta Lake** storage (Bronze, Silver, Gold) orchestrated by **Apache Airflow** and powered by **PySpark** with Compaction and Z-Order optimization.
 - **Data Warehouse Serving:** Synchronizes Gold zone One Big Tables (OBT) and Dimensional models into **PostgreSQL** for business intelligence and quantitative analysis (DBeaver).
 - **Data Governance:** Automated end-to-end data lineage, schema contracts, and Great Expectations quality metrics via **Acryl DataHub**.
@@ -29,16 +29,16 @@ This enterprise data platform implements a hybrid Lambda/Kappa-inspired architec
 
 ## 2. High-Level System Deployment Diagram
 
-Below is the high-level system deployment architecture illustrating the 4 core color-coded data processing flows:
+Below is the high-level system deployment architecture illustrating the core data processing flows:
 
 ![Credit Risk Data Platform - High Level Architecture](./docs/images/architecture-diagram.png)
 
 ### Architecture Principles & Rubric Compliance
 
-1. **Deployable Units Only:** Every box represents an independently deployable container, cluster service, or external UI (`Data Generator Service (Docker)`, `Apache Kafka Broker (Docker)`, `Apache Airflow Orchestrator (Docker)`, `PostgreSQL Data Warehouse (Docker)`, `DataHub Data Governance Platform (Docker)`, etc.). Embedded libraries/SDKs (Feast SDK, Pydantic, Great Expectations) execute inside the container processes and are omitted as separate boxes.
+1. **Deployable Units Only:** Every box represents an independently deployable container, cluster service, or external UI (`Data Generator Service (Docker)`, `MinIO S3 External Storage (Docker)`, `Apache Kafka Broker (Docker)`, `Apache Airflow Orchestrator (Docker)`, `PostgreSQL Data Warehouse (Docker)`, `DataHub Data Governance Platform (Docker)`, etc.). Embedded libraries/SDKs (Feast SDK, Pydantic, Great Expectations) execute inside the container processes and are omitted as separate boxes.
 2. **Data Flow & Arrow Directions:** Arrows strictly follow data transmission direction with explicit payload labels on arrow badges (`1.1 Credit Events (JSON)`, `1.2 Streaming Events`, `2.2 Read Raw Data (Parquet/Delta)`, `3.1 SQL Query / Analytics`, `4.1 Metadata & Lineage`).
 3. **Numbered Multi-Flow Lineage:** Distinct color-coded flows with step numbers demarcate platform operations:
-   - **Flow 1: Streaming Data Flow (Real-Time — Blue Steps 1.1 to 1.3):** Real-time synthetic event generation, Kafka topic streaming, PyFlink 60s window aggregation, and Bronze zone Parquet streaming sinks.
+   - **Flow 1: Streaming Data Flow (Real-Time — Blue Steps 1.1 to 1.3 & MinIO S3 Ingestion):** Real-time synthetic event generation, Kafka topic streaming, PyFlink 60s window aggregation, MinIO S3 external batch streaming, and Bronze zone Parquet streaming sinks.
    - **Flow 2: Batch Data Flow (Offline — Green Steps 2.1 to 2.4):** Airflow-triggered PySpark batch ETL processing, reading raw Bronze Parquet files, writing Silver & Gold Delta Lake tables with Compaction and Z-Order clustering, and syncing Gold tables to PostgreSQL DW.
    - **Flow 3: Serving / Analytics Flow (User Query — Orange Step 3.1):** End-user Risk Analysts performing SQL analytical queries on Gold 360 Risk tables via DBeaver.
    - **Flow 4: Governance & Metadata Flow (Lineage & Quality — Dashed Purple Step 4.1):** Automated emission of data lineage, schema contracts, and data quality execution metadata across Lakehouse zones to DataHub.
@@ -60,7 +60,7 @@ credit-risk-data-platform/
 │   ├── Offline_Data_Pipeline_Index.md # [Doc] Offline data pipeline index & specs
 │   ├── offline_pipeline_optimization_report.md # [Doc] Delta Lake compaction & Z-Order benchmark
 │   ├── Offline_Processing_Index.md # [Doc] Offline processing architecture summary
-│   ├── Online_Data_Pipeline_Index.md  # [Doc] Online streaming pipeline specs
+│   ├── Online_Data_Pipeline_Index.md  # [Doc] Online streaming pipeline & MinIO specs
 │   ├── schema_design.md            # [Doc] Multi-Zone DBeaver Schema & ER diagram evidence
 │   ├── streaming_pipeline_report.md# [Doc] Flink baseline vs optimized streaming report
 │   ├── images/                     # Screenshot assets & architecture diagrams
@@ -70,9 +70,17 @@ credit-risk-data-platform/
 │       ├── Docker_Optimization.md  # Docker multi-stage build reference guide
 │       └── storage.md              # Baseline Parquet vs Delta Lake Lakehouse comparison
 │
-├── generators/                     # Data generator scripts
+├── generators/                     # Data generator & stream loader scripts
 │   ├── credit_events.py            # Simulated credit risk event generator
+│   ├── offline_data_gen.py         # Offline batch dataset generator
+│   ├── online_stream_gen.py        # Real-time transaction generator with anomalies
+│   ├── online_stream_loader.py     # Pushes streaming batches to external MinIO S3 bucket
 │   └── send_stream_data.py         # Streaming Kafka producer application
+│
+├── pipelines/                      # Bronze Zone ingestion & batch pipelines
+│   ├── ingest_offline_bronze.py    # Offline batch data Bronze ingestion pipeline
+│   ├── ingest_online_bronze.py     # Pulls streaming batches from MinIO S3 into Bronze
+│   └── run_offline_pipeline.py     # End-to-end offline pipeline orchestrator
 │
 ├── streaming/                      # Real-time streaming PyFlink applications
 │   ├── flink_baseline_job.py       # Baseline PyFlink 30s processing job
@@ -106,16 +114,28 @@ cd credit-risk-data-platform
 # Build optimized Data Generator image
 docker build -f Dockerfile -t credit-risk-platform:optimized .
 
-# Launch services (Kafka, Zookeeper, Postgres, Airflow)
+# Launch core services (Kafka, Zookeeper, Postgres, Airflow)
 docker-compose up -d
+
+# Spin up MinIO container (External S3 object storage for streaming batches)
+docker run -d --name minio_streaming_source -p 9000:9000 -p 9001:9001 -e "MINIO_ROOT_USER=minioadmin" -e "MINIO_ROOT_PASSWORD=minioadmin" minio/minio server /data --console-address ":9001"
 
 # Verify container status
 docker ps
 ```
 
-### Step 2: Running Real-Time Streaming Pipeline
-To run the PyFlink streaming jobs and stream live transaction events:
+### Step 2: Running Real-Time Streaming & MinIO Pipeline
+To run the streaming data pipelines:
+
 ```bash
+# --- Option A: External MinIO S3 Batch Streaming Flow ---
+# 1. Generate streaming transaction batches and push to MinIO S3 bucket (external-streaming-source)
+.venv\Scripts\python.exe generators/online_stream_loader.py
+
+# 2. Ingest streaming batches from MinIO S3 into Bronze Zone (data/bronze/online/)
+.venv\Scripts\python.exe pipelines/ingest_online_bronze.py
+
+# --- Option B: Apache Kafka & PyFlink Streaming Flow ---
 # Terminal 1 — Launch Flink Baseline Stream Job (Port 8081)
 .venv\Scripts\python.exe streaming/flink_baseline_job.py
 
@@ -125,7 +145,10 @@ To run the PyFlink streaming jobs and stream live transaction events:
 # Terminal 3 — Produce 100 streaming credit risk events to Kafka
 .venv\Scripts\python.exe generators/send_stream_data.py
 ```
-*Access Flink Dashboard:* `http://localhost:8081` or `http://localhost:8082`
+
+*Access Web & Console Interfaces:*
+- **MinIO Console:** `http://localhost:9001` (User: `minioadmin` / Password: `minioadmin`)
+- **Flink Dashboard:** `http://localhost:8081` or `http://localhost:8082`
 
 ### Step 3: Running Airflow Batch DAGs & Data Warehouse Sync
 Access the Airflow Web UI to monitor and trigger batch data pipelines:
