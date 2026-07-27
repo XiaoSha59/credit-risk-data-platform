@@ -29,20 +29,41 @@ This enterprise data platform implements a hybrid Lambda/Kappa-inspired architec
 
 ## 2. High-Level System Deployment Diagram
 
-Below is the high-level system deployment architecture illustrating the core data processing flows:
+Below is the high-level system deployment architecture illustrating the core data processing flows across the enterprise platform:
 
 ![Credit Risk Data Platform - High Level Architecture](./docs/images/architecture-diagram.png)
 
-### Architecture Principles & Rubric Compliance
+### Architecture Principles & Component Breakdown
 
-1. **Deployable Units Only:** Every box represents an independently deployable container, cluster service, or external UI (`Data Generator Service (Docker)`, `MinIO S3 External Storage (Docker)`, `Apache Kafka Broker (Docker)`, `Apache Airflow Orchestrator (Docker)`, `PostgreSQL Data Warehouse (Docker)`, `DataHub Data Governance Platform (Docker)`, etc.). Embedded libraries/SDKs (Feast SDK, Pydantic, Great Expectations) execute inside the container processes and are omitted as separate boxes.
-2. **Data Flow & Arrow Directions:** Arrows strictly follow data transmission direction with explicit payload labels on arrow badges (`1.1 Credit Events (JSON)`, `1.2 Streaming Events`, `2.2 Read Raw Data (Parquet/Delta)`, `3.1 SQL Query / Analytics`, `4.1 Metadata & Lineage`).
-3. **Numbered Multi-Flow Lineage:** Distinct color-coded flows with step numbers demarcate platform operations:
-   - **Flow 1: Streaming Data Flow (Real-Time — Blue Steps 1.1 to 1.3 & MinIO S3 Ingestion):** Real-time synthetic event generation, Kafka topic streaming, PyFlink 60s window aggregation, MinIO S3 external batch streaming, and Bronze zone Parquet streaming sinks.
-   - **Flow 2: Batch Data Flow (Offline — Green Steps 2.1 to 2.4):** Airflow-triggered PySpark batch ETL processing, reading raw Bronze Parquet files, writing Silver & Gold Delta Lake tables with Compaction and Z-Order clustering, and syncing Gold tables to PostgreSQL DW.
-   - **Flow 3: Serving / Analytics Flow (User Query — Orange Step 3.1):** End-user Risk Analysts performing SQL analytical queries on Gold 360 Risk tables via DBeaver.
-   - **Flow 4: Governance & Metadata Flow (Lineage & Quality — Dashed Purple Step 4.1):** Automated emission of data lineage, schema contracts, and data quality execution metadata across Lakehouse zones to DataHub.
-4. **Solid vs Dashed Lines:** Primary data processing paths use solid lines (Flows 1, 2, 3); dashed purple lines are reserved for metadata, lineage, and governance synchronization (Flow 4).
+1. **Deployable Units Only:** Every box in the deployment diagram represents an independently deployable container, cluster service, or external UI:
+   - 🐳 **Data Generator Service (Docker):** Generates synthetic credit transactions with realistic anomaly injections (burst traffic, late arrivals, duplicate retries).
+   - 📦 **MinIO S3 External Storage (Docker):** Containerized S3-compatible object storage (`http://localhost:9000`) acting as the external department source bucket (`external-streaming-source`).
+   - ⚡ **Apache Kafka Broker (Docker):** Real-time message streaming bus receiving JSON event streams from the producer.
+   - 🌊 **Apache PyFlink Engine:** Distributed stream processing engine running 60-second tumbling window aggregations with real-time risk classification (`HIGH`, `MEDIUM`, `LOW`).
+   - ⚙️ **Apache Airflow Orchestrator (Docker):** DAG scheduler (`http://localhost:8085`) managing batch ingestion, Delta transformations, and DW sync tasks (`dp1_ingest_raw`, `dp2_silver_transform`, `dp3_gold_dw_sync`).
+   - 📊 **PySpark Lakehouse Engine:** Batch processing framework handling Medallion transformations, Delta Lake compaction, and Z-Order spatial clustering.
+   - 🐘 **PostgreSQL Data Warehouse (Docker):** Relational serving database hosting Gold zone dimensional schemas (`bronze`, `silver`, `gold`).
+   - 🔍 **Acryl DataHub Platform (Docker):** Centralized governance portal capturing automated data lineage, schema contracts, and data quality metrics.
+
+2. **Data Flow & Arrow Directions:** Arrows strictly follow data transmission direction with explicit payload labels on arrow badges:
+   - `1.1 Credit Events (JSON) / S3 Batch`: Payload pushed from generator to Kafka topic / MinIO S3 bucket.
+   - `1.2 Streaming Events / Bronze Parquet`: Real-time windowed records & MinIO batches written to Bronze zone storage.
+   - `2.1 Airflow DAG Trigger`: Orchestration control signals sent to PySpark batch scripts.
+   - `2.2 Read Raw Data (Parquet / Delta)`: PySpark reading raw Bronze Parquet files.
+   - `2.3 Delta Medallion Transformations`: Cleaning, deduplication, and compaction across Silver and Gold Delta tables.
+   - `2.4 Sync Gold OBT`: Bulk loading Gold One Big Tables into PostgreSQL DW schemas.
+   - `3.1 SQL Analytics Query`: Analytical SQL queries executed from DBeaver to PostgreSQL DW.
+   - `4.1 Metadata & Lineage`: Asynchronous emission of lineage graph, schema contracts, and GE quality test execution logs to DataHub.
+
+3. **Numbered Multi-Flow Lineage:**
+   - **Flow 1: Streaming Data & External S3 Storage Flow (Blue Steps 1.1 to 1.3):**
+     - *Path 1A (Kafka/Flink Streaming):* Generator -> Kafka Topic -> PyFlink 60s window aggregation -> Bronze Parquet Sink (`data/bronze/online/`).
+     - *Path 1B (MinIO Batch Streaming):* Generator -> MinIO S3 bucket (`external-streaming-source`) -> `ingest_online_bronze.py` -> Bronze Zone Storage.
+   - **Flow 2: Offline Medallion Batch Flow (Green Steps 2.1 to 2.4):** Airflow-scheduled PySpark batch jobs reading Bronze Parquet files, applying data quality rules, creating Silver Delta Lake tables, performing compaction and Z-Order optimization, building Gold zone 360-degree risk analytical models, and syncing into PostgreSQL DW.
+   - **Flow 3: Serving & Analytics Flow (Orange Step 3.1):** End-user Risk Analysts and Quantitative Modelers querying Gold zone DW tables via DBeaver for credit risk reporting.
+   - **Flow 4: Data Governance & Lineage Flow (Dashed Purple Step 4.1):** Automated metadata emission across all ingestion, processing, and serving layers into DataHub for complete end-to-end lineage visualization and schema contract monitoring.
+
+4. **Solid vs Dashed Lines:** Primary data processing paths use solid lines (Flows 1, 2, 3); dashed purple lines denote background metadata, lineage, and governance synchronization (Flow 4).
 
 ---
 
