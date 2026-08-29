@@ -1,0 +1,7 @@
+stream_name: "credit_card_transactions"
+n_transactions_per_batch: 5000
+burst_probability: 0.15          # Xác suất xuất hiện đợt bùng nổ lưu lượng (Burst traffic)
+burst_multiplier: 3.0            # Hệ số nhân lượng giao dịch khi có burst
+late_arrival_rate: 0.08          # Tỷ lệ bản ghi đến muộn (event_time cũ hơn ingestion_time)
+duplicate_rate: 0.015            # Tỷ lệ trùng lặp dữ liệu (1.5% như ví dụ trong đề)
+days_history: 180

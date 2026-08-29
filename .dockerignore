@@ -1,0 +1,32 @@
+# Python Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache & compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+
+# Git & IDE configurations
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Docker build logs & Documentation
+*.log
+*.md
+docs/
+
+# Data files (Prevent copying large datasets into the image)
+data/raw/*
+data/processed/*
+*.tar.gz
+*.zip
+*.parquet
+*.csv

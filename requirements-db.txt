@@ -1,0 +1,8 @@
+# Requirements for Database-backed Ingestion (PostgreSQL / External Source Simulation)
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+pandas>=2.0.0
+pyarrow>=12.0.0
+PyYAML>=6.0
+
+boto3>=1.26.0

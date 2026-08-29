@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. FOUNDATIONAL INFRASTRUCTURE (Đã đổi port để nhường 9092/2181 cho DataHub)
+  # ----------------------------------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: platform-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - credit-risk-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: platform-kafka
+    ports:
+      - "9093:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://127.0.0.1:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    networks:
+      - credit-risk-network
+
+  data-generator:
+    container_name: platform-data-generator
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - ENVIRONMENT=development
+    depends_on:
+      - kafka
+    networks:
+      - credit-risk-network
+
+  # ----------------------------------------------------------------------------
+  # 2. DATA WAREHOUSE (POSTGRESQL - for DBeaver schema visualization)
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: credit_risk_postgres
+    environment:
+      POSTGRES_USER: creditrisk
+      POSTGRES_PASSWORD: creditrisk123
+      POSTGRES_DB: credit_risk_dw
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docs/sql/schema_setup.sql:/docker-entrypoint-initdb.d/schema_setup.sql
+    networks:
+      - credit-risk-network
+
+  # ----------------------------------------------------------------------------
+  # 3. ORCHESTRATION INFRASTRUCTURE (AIRFLOW)
+  # ----------------------------------------------------------------------------
+  airflow:
+    image: apache/airflow:2.9.0-python3.10
+    container_name: credit_risk_airflow
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+    ports:
+      - "8085:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./storage:/opt/airflow/storage
+      - ./data:/opt/airflow/data
+    networks:
+      - credit-risk-network
+    command: >
+      bash -c "airflow standalone"
+
+networks:
+  credit-risk-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -1,0 +1,21 @@
+# configs/offline_config.yaml
+
+# 1. Number of records (1.5 million rows for Spark UI stress testing)
+n_loans: 1500000
+
+# 2. Date range for loan applications
+start_date: "2020-01-01"
+end_date: "2023-12-31"
+
+# 3. Data quality issue rates
+duplicate_rate: 0.02  # 2% duplicate rows
+schema_evolution_cutoff_days: 730  # Records older than 2 years will have NULL credit scores
+
+# 4. Severe Data Skew to test Spark AQE 
+skew_distributions:
+  loan_purpose:
+    categories: ["Home", "Car", "Personal", "Business"]
+    probabilities: [0.4, 0.3, 0.2, 0.1]
+  branch_city:
+    categories: ["Ho Chi Minh", "Ha Noi", "Da Nang"]
+    probabilities: [0.80, 0.15, 0.05]  # 80% data in HCMC causes deliberate task skew

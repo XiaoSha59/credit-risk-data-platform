@@ -1,0 +1,21 @@
+# Use the full, unoptimized Python image (~1GB base size)
+FROM python:3.10
+
+WORKDIR /app
+
+# Install build tools without cleaning up APT cache
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl
+
+# Copy dependencies list
+COPY requirements-gen.txt .
+
+# Install Python packages without disabling cache, leading to image bloat
+RUN pip install -r requirements-gen.txt
+
+# Copy application code
+COPY . .
+
+# Execute the data generator script
+CMD ["python", "generators/credit_events.py"]
